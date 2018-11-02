@@ -1,0 +1,29 @@
+
+[agent]
+round_interval = true
+
+[[inputs.exec]]
+  commands = ["/opt/telegraf/scaleio.py -p"]
+  data_format = "influx"
+  timeout = "5s"
+  interval = "20s"
+
+[[inputs.exec]]
+  commands = ["/opt/telegraf/scaleio.py -c"]
+  data_format = "influx"
+  timeout = "5s"
+  interval = "30m"
+
+[[inputs.exec]]
+  commands = ["/opt/telegraf/scaleio.py -h"]
+  data_format = "influx"
+  timeout = "5s"
+  interval = "15m"
+
+
+[[outputs.influxdb]]
+  url = "http://10.10.10.10:8086"
+  database = "telegraf_db"
+  username = "scaleio"
+  password = "scaleio"
+
