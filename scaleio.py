@@ -332,7 +332,7 @@ def str2bool(v):
 
 def err2bool(v):
     if type(v) == types.BooleanType:
-	return v
+        return v
     return int(v.lower() in ("error"))
 def my_debug(msg):
     if CONF['debug']:
@@ -375,7 +375,7 @@ def main(argv):
             assert False, "Nothing to do"
             exit()
     if (sclio_login()==1):
-	if params == 3:
+	    if params == 3:
             get_disks(params)
         else:
             get_pools(params)
