@@ -11,6 +11,12 @@ import json
 import shlex
 import getopt,sys
 
+MDMS = {
+    'MDM_IP1':  '1.1.1.1',
+    'MDM_IP2':  '1.1.1.2',
+    'MDM_IP3':  '1.1.1.3'
+}
+
 CONF = {
     'debug':          False,
     'verbose':        False,
@@ -42,7 +48,7 @@ VOLUMES_PERF = (
 )
 
 SDSS_CAP = (
-'ID,NAME,MAX_CAPACITY_IN_KB,MAX_CAPACITY_IN_KB,'
+'ID,NAME,MAX_CAPACITY_IN_KB,MAX_CAPACITY_IN_KB,NUM_OF_DEVICES'
 )
 
 SDSS_PERF = (
@@ -72,23 +78,37 @@ class AutoVivification(dict):
 
 def check_output(cmd):
     try:
-        out=subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        out=subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output = out.communicate()[0]
     except Exception as e:
         print('Error on executing command %s --- %s' %(e, traceback.format_exc()))
         exit(1)
     return output
 
-def sclio_login():
-    login_cmd = (CONF['scli_cmd'] + " --login --username=" + CONF['scli_user'] + " --password='" + CONF['scli_password'] + "' --mdm_ip=" + CONF['mdm_ip'])
+def sclio_try_login(mdm_ip):
+    login_cmd = (CONF['scli_cmd'] + " --login --username=" + CONF['scli_user'] + " --password='" + CONF['scli_password'] + "' --mdm_ip=" + mdm_ip)
     my_debug(login_cmd)
     out = check_output(shlex.split(login_cmd))
     my_debug(out)
 
     if 'Logged in' in out:
+        CONF['mdm_ip']=mdm_ip
         return 1
     else:
         return 0
+
+def sclio_login():
+
+    if (sclio_try_login(MDMS['MDM_IP1'])==1):
+        return 1
+    else:
+        if (sclio_try_login(MDMS['MDM_IP2'])==1):
+            return 1
+        else:
+            if (sclio_try_login(MDMS['MDM_IP3'])==1):
+                return 1
+            else:
+                return 0
 
 def sclio_logout():
     logout_cmd = ("scli --logout --mdm_ip=" + CONF['mdm_ip'])
@@ -135,6 +155,7 @@ def get_sds(opt_params):
         return
     for sds_id, sds in sdss.iteritems():
         if opt_params!=1 : dispatch_value('sds', long(sds['MAX_CAPACITY_IN_KB']) / 2, sds['NAME'], 'MAX_CAPACITY_IN_KB_RAW')
+        if opt_params!=1 : dispatch_value('sds', long(sds['NUM_OF_DEVICES']), sds['NAME'], 'NUM_OF_DEVICES')
         if opt_params!=2 : dispatch_value('sds', long(sds['TOTAL_READ_BWC']['IOPS']), sds['NAME'], 'TOTAL_READ_BWC_IOPS')
         if opt_params!=2 : dispatch_value('sds', long(sds['TOTAL_WRITE_BWC']['IOPS']), sds['NAME'], 'TOTAL_WRITE_BWC_IOPS')
         if opt_params!=2 : dispatch_value('sds', long(sds['TOTAL_READ_BWC']['BPS']), sds['NAME'], 'TOTAL_READ_BWC_BPS')
@@ -170,7 +191,7 @@ def get_disks(opt_params):
     sdss = read_properties('--query_properties', '--object_type', 'SDS', '--all_objects',
         '--properties', 'NAME')
     if sdss == None:
-        return    
+        return
 
     for disk_id, disk in disks.iteritems():
         dispatch_value_ex('disk',disk['NAME'],'sds',sdss[disk['SDS_ID']]['NAME'], 'failed',err2bool(disk['ERR_STATE']))
@@ -375,14 +396,14 @@ def main(argv):
             assert False, "Nothing to do"
             exit()
     if (sclio_login()==1):
-	    if params == 3:
+        if params == 3:
             get_disks(params)
         else:
             get_pools(params)
             get_volumes(params)
             get_sds(params)
             get_sdc(params)
-	
+
         sclio_logout()
     else:
         print('Error: Login failed')
