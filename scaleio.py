@@ -11,6 +11,7 @@ import json
 import shlex
 import getopt,sys
 
+#If this is an AMS system, IP1 should be the AMS address.
 MDMS = {
     'MDM_IP1':  '1.1.1.1',
     'MDM_IP2':  '1.1.1.2',
@@ -18,14 +19,15 @@ MDMS = {
 }
 
 CONF = {
-    'debug':          False,
-    'verbose':        False,
-    'scli_user':      'admin',
-    'scli_password':  'admin',
-    'mdm_ip':         '1.1.1.1',
-    'pools':          [],
-    'scli_cmd':      'scli',
-    'ignoreselected': False,
+    'debug':          False,                 #Debug
+    'verbose':        False,                 #Extra info (needs to be rewriten or removed)
+    'scli_user':      'admin',               #User to connect to the cluster
+    'scli_password':  'admin',               #Password for the cluster
+    'mdm_ip':         '1.1.1.1',             #IP for the cluster
+    'pools':          [],                    #Used with 'ignoreselected'
+    'scli_cmd':       '/opt/clinicit/scli',  #name of the binary scli. Should be accessible by path.
+    'ignoreselected': False,                 #Ignores pools listedn in 'pools'
+    'metric_label':   'vxflex_',             #All Metrics will have this string prepended to the output.
 }
 
 POOLS_CAP = (
@@ -81,12 +83,12 @@ def check_output(cmd):
         out=subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output = out.communicate()[0]
     except Exception as e:
-        print('Error on executing command %s --- %s' %(e, traceback.format_exc()))
+        print('Error on executing command: %s --- %s' %(e, traceback.format_exc()))
         exit(1)
     return output
 
 def sclio_try_login(mdm_ip):
-    login_cmd = (CONF['scli_cmd'] + " --login --username=" + CONF['scli_user'] + " --password='" + CONF['scli_password'] + "' --mdm_ip=" + mdm_ip)
+    login_cmd = (CONF['scli_cmd'] + " --login --tech --username=" + CONF['scli_user'] + " --password='" + CONF['scli_password'] + "' --mdm_ip=" + mdm_ip)
     my_debug(login_cmd)
     out = check_output(shlex.split(login_cmd))
     my_debug(out)
@@ -111,16 +113,16 @@ def sclio_login():
                 return 0
 
 def sclio_logout():
-    logout_cmd = ("scli --logout --mdm_ip=" + CONF['mdm_ip'])
+    logout_cmd = (CONF['scli_cmd'] + " --tech --logout --mdm_ip=" + CONF['mdm_ip'])
     out = check_output(shlex.split(logout_cmd))
     my_debug(out)
 
 def dispatch_value(plugin, value, plugin_instance=None, type_instance=None):
-    print('%s,%s=%s %s=%s' % ('scaleio_' + plugin, plugin, plugin_instance, type_instance, value))
+    print('%s,%s=%s %s=%s' % (CONF['metric_label'] + plugin, plugin, plugin_instance, type_instance, value))
 
 #Example output example,tag1=a,tag2=b i=42i,j=43i,k=44i
 def dispatch_value_ex(label, label_val, tag1, tag1_val, i=None, i_val=None):
-    print('%s,%s=%s,%s=%s %s=%s' % ('scaleio_' + label, label, label_val,tag1 ,tag1_val, i, i_val ))
+    print('%s,%s=%s,%s=%s %s=%s' % (CONF['metric_label'] + label, label, label_val,tag1 ,tag1_val, i, i_val ))
 
 def get_sdc(opt_params):
     if opt_params == 1 :
@@ -289,9 +291,8 @@ def get_pools(opt_params):
 def read_properties(*cmd):
     properties = AutoVivification()
     out = None
-    real_cmd = (CONF['scli_cmd'],'--mdm_ip='+CONF['mdm_ip']) + cmd
-    my_debug('Executing command: %s %s%s %s' % (CONF['scli_cmd'], '--mdm_ip=', CONF['mdm_ip'], " ".join(str(v) for v in cmd)))
-#        out = subprocess.check_output(real_cmd, stderr=subprocess.STDOUT)
+    real_cmd = (CONF['scli_cmd'],'--mdm_ip='+CONF['mdm_ip'], '--tech') + cmd
+    my_debug('Executing command: %s ' % (" ".join(str(v) for v in real_cmd)))
     out = check_output(real_cmd)
 
     if 'Failed to connect to MDM' in out:
@@ -410,4 +411,3 @@ def main(argv):
 
 if __name__ == "__main__":
     main(sys.argv[1:])
-
